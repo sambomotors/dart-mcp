@@ -59,3 +59,17 @@ test('missing and imprecise values stay null; genuine zero stays zero',()=>{
   for(const x of [null,undefined,'',' ','-','N/A','abc','9007199254740992']) assert.equal(krxNumber(x),null);
   assert.equal(krxNumber('0'),0); assert.equal(krxNumber('-1.25'),-1.25);
 });
+test('missing date differs from a genuine date mismatch without asserting data validity',async()=>{
+  for(const value of [undefined,null,'',' ']) {
+    const sample={...row};
+    if(value===undefined) delete sample.BAS_DD; else sample.BAS_DD=value;
+    const r=await queryKrx({...input,service:'basic'},{...opts,fetchImpl:response({OutBlock_1:[sample]})});
+    assert.equal(r.status,'DATE_UNAVAILABLE');
+    assert.equal(r.returned_date,null); assert.equal(r.data,undefined);
+    assert.equal(r.date_field_present,value!==undefined);
+  }
+  const r=await queryKrx(input,{...opts,fetchImpl:response({OutBlock_1:[{...row,BAS_DD:'20260915'}]})});
+  assert.equal(r.status,'DATE_MISMATCH'); assert.equal(r.returned_date,'20260915');
+  const invalid=await queryKrx(input,{...opts,fetchImpl:response({OutBlock_1:[{...row,BAS_DD:20260916}]})});
+  assert.equal(invalid.status,'SCHEMA_ERROR'); assert.equal(invalid.date_value_type,'number');
+});
