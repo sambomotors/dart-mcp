@@ -63,7 +63,7 @@ test('missing date differs from a genuine date mismatch without asserting data v
   for(const value of [undefined,null,'',' ']) {
     const sample={...row};
     if(value===undefined) delete sample.BAS_DD; else sample.BAS_DD=value;
-    const r=await queryKrx({...input,service:'basic'},{...opts,fetchImpl:response({OutBlock_1:[sample]})});
+    const r=await queryKrx(input,{...opts,fetchImpl:response({OutBlock_1:[sample]})});
     assert.equal(r.status,'DATE_UNAVAILABLE');
     assert.equal(r.returned_date,null); assert.equal(r.data,undefined);
     assert.equal(r.date_field_present,value!==undefined);
@@ -72,4 +72,17 @@ test('missing date differs from a genuine date mismatch without asserting data v
   assert.equal(r.status,'DATE_MISMATCH'); assert.equal(r.returned_date,'20260915');
   const invalid=await queryKrx(input,{...opts,fetchImpl:response({OutBlock_1:[{...row,BAS_DD:20260916}]})});
   assert.equal(invalid.status,'SCHEMA_ERROR'); assert.equal(invalid.date_value_type,'number');
+});
+test('basic response without basis date returns qualified metadata, never invented date',async()=>{
+  for(const date of [undefined,null,'']) {
+    const sample={ISU_CD:'KR7126730009',ISU_SRT_CD:'126730',ISU_NM:'코칩',LIST_DD:'20240507',LIST_SHRS:'8770126'};
+    if(date!==undefined) sample.BAS_DD=date;
+    const r=await queryKrx({...input,service:'basic'},{...opts,fetchImpl:response({OutBlock_1:[sample]})});
+    assert.equal(r.status,'PARTIAL'); assert.equal(r.basis_date,null);
+    assert.equal(r.requested_date,'20260917'); assert.equal(r.date_verification,'UNAVAILABLE');
+    assert.equal(r.raw_fields.ISU_NM,'코칩'); assert.equal(r.data.listed_shares,8770126);
+    assert.equal(r.kind_status,'NOT_CHECKED');
+  }
+  const mismatch=await queryKrx({...input,service:'basic'},{...opts,fetchImpl:response({OutBlock_1:[{...row,BAS_DD:'20260916'}]})});
+  assert.equal(mismatch.status,'DATE_MISMATCH'); assert.equal(mismatch.data,undefined);
 });
